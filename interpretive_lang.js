@@ -7,254 +7,140 @@ const rl = readline.createInterface({
 });
 
 let stack = [];
-let pc = 0;
 
 const err = (str) => {
-    console.log(`\n${str} at line ${pc}`);
-    process.exit(0);
+    console.log(str);
+    process.exit(1);
 };
 
-const pop = (index = -1) => {
-    if (stack.length < 1) {
-        err("Error: Stack underflow");
-    } else {
-        return stack.splice(index, 1)[0];
-    }
-};
-
-const handlePour = (message) => {
-    const reversedMessage = message.split('').reverse();
-    for (const char of reversedMessage) {
-        stack.push(char.charCodeAt(0));
-    }
-    if (message.length === 0) {
-        stack.push(32);
-    }
-};
-
-const handlePrintStack = () => {
-    const reversedStack = stack.slice().reverse(); // Create a copy of the stack and reverse it
-    const stackString = reversedStack.map((charCode) => String.fromCharCode(charCode)).join("");
-    const words = stackString.split(/\s+/).reverse().join(" "); // Split by spaces, reverse, and join back
-    console.log(words);
-};
-
-const handleOrder = () => {
-    return new Promise((resolve, reject) => {
-        rl.question('Enter input: ', (input) => {
-            // console.log(`Input is: ${input}`);
-            for (const char of input) {
-                const charCode = char.charCodeAt(0);
-                stack.push(charCode);
-            }
-            handlePrintStack();
-            resolve();
-        });
-    });
-};
-
-// Define a function to handle the NAME command
 const handleName = async () => {
     return new Promise((resolve, reject) => {
-        rl.question('Enter your input: ', (input) => {
-            const words = input.split(' ').reverse().join(' '); // Reverse the order of words
-            const reversedInput = words.split('').reverse().join('');
-            for (const char of reversedInput) {
-                const charCode = char.charCodeAt(0);
-                stack.push(charCode);
-            }
+        rl.question('Enter string: ', (input) => {
+            stack.push(input);
             resolve();
         });
     });
 };
 
 
-//handing repeater 
-const handleRepeat = async () => {
-    if (stack.length < 2) { // Ensure at least two elements on the stack
-        err("Error: Insufficient elements in stack for REPEAT command");
-        return;
-    }
-    const repeatCount = pop(); // Pop the repeat count first
-    const repeatChar = String.fromCharCode(pop()); // Pop the character code next
-    if (repeatCount === 0) {
-        return; // If repeat count is 0, no need to repeat, just return
-    }
-    if (isNaN(repeatCount) || repeatCount < 0) {
-        err("Error: Invalid repeat count");
-        return;
-    }
-    const repeatedString = repeatChar.repeat(repeatCount);
-    for (const char of repeatedString) {
-        stack.push(char.charCodeAt(0));
-    }
-};
-
-// ASK command
-const handleAsk = async () => {
+const handleTip = async () => {
     return new Promise((resolve, reject) => {
-        rl.question('Enter a single character: ', (input) => {
-            if (input.length !== 1) {
-                console.log("Error: You must enter a single character.");
-                rl.close();
-                reject();
+        rl.question('Enter an integer: ', (input) => {
+            const num = parseInt(input);
+            if (!isNaN(num)) {
+                stack.push(num);
+                resolve();
             } else {
-                const charCode = input.charCodeAt(0);
-                stack.push(charCode);
-                rl.question('Enter repeat count: ', (count) => {
-                    if (!isNaN(count) && count >= 0) {
-                        stack.push(parseInt(count));
-                        resolve();
-                    } else {
-                        console.log("Error: Invalid repeat count.");
-                        rl.close();
-                        reject();
-                    }
-                });
+                console.log("Error: Invalid input. Please enter an integer.");
+                reject();
             }
         });
     });
 };
 
-const interpret = async () => {
+const handleGreeting = (characters) => {
+    characters.split('').forEach(char => {
+        stack.push(char.charCodeAt(0));
+    });
+};
+
+//handleorder converts the stack to ascii
+const handleOrder = () => {
+    const asciiChars = stack.map(charCode => String.fromCharCode(charCode));
+    console.log(asciiChars.join(''));
+
+};
+
+//stright just prints the stack
+const handleOrderStright = () => {
+    console.log(stack.join(''));
+};
+
+
+const handleReceipt = () => {
+    if (stack.length < 2) {
+        console.log("Error: Insufficient elements in stack for RECEIPT command");
+        return;
+    }
+
+    const repeatCount = stack.pop();
+    const valueToRepeat = stack.pop();
+
+    const repeatedValues = String(valueToRepeat).repeat(repeatCount);
+    stack.push(...repeatedValues.split('').map(Number));
+    console.log(stack.join(''));
+};
+
+
+const handlePour = () => {
+    stack = stack.map(item => item.split('').reverse().join(''));
+};
+
+
+
+const handleMocha = () => {
+    if (stack.length < 2) {
+        err("Error: Insufficient elements in stack for MOCHA command");
+    }
+    const b = parseFloat(stack.pop());
+    const a = parseFloat(stack.pop());
+    stack.push(a * b);
+};
+
+
+const interpret = async (lines) => {
+    for (const line of lines) {
+        const trimmedLine = line.trim(); // Remove any leading/trailing whitespace
+        if (trimmedLine === '') continue; // Skip empty lines
+        const parts = trimmedLine.split(" ");
+        const instr = parts[0];
+        const args = parts.slice(1).join(' ');
+
+        switch (instr) {
+            case "NAME":
+                await handleName();
+                break;
+            case "TIP":
+                await handleTip();
+                break;
+            case "GREETING":
+                handleGreeting(args);
+                break;
+            case "ORDER":
+                handleOrder();
+                break;
+            case "STRIGHTORDER":
+                handleOrderStright();
+                break;
+            case "RECEIPT":
+                handleReceipt();
+                break;
+            case "POUR":
+                handlePour();
+                break;
+            case "MOCHA":
+                handleMocha();
+                break;
+            case "BLACK":
+                process.exit(0);
+            default:
+                console.log("Invalid instruction:", instr);
+                process.exit(1);
+        }
+    }
+};
+
+// Check if a filename is provided as a command-line argument
+if (process.argv.length > 2) {
     const fileName = process.argv[2];
     try {
         const lines = fs.readFileSync(fileName, 'utf8').split('\r\n');
-        while (pc >= 0 && pc < lines.length) {
-            const parts = lines[pc].split(" ");
-            const instr = parts[0];
-            pc += 1;
-
-            switch (instr) {
-                case "DECAF":
-                    stack.push(0);
-                    break;
-                case "FRAP":
-                    if (stack.length > 0) {
-                        const value = stack[stack.length - 1];
-                        stack.push(value);
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "EXTRA_SHOT":
-                    if (stack.length > 0) {
-                        const value = pop();
-                        stack.push(value + 1);
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "ORDER":
-                    await handleOrder();
-                    break;
-                case "POUR":
-                    handlePour(parts.slice(1).join(' '));
-                    break;                
-                case "READY":
-                    if (stack.length > 0) {
-                        console.log(String.fromCharCode(pop()));
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "COST":
-                    if (stack.length > 0) {
-                        console.log("Answer: " +pop());
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "LATTE":
-                    if (stack.length > 0) {
-                        const n = pop();
-                        if (n === 0) {
-                            pc = parseInt(parts[1]) - 1;
-                        }
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "COLD_FOAM":
-                    if (stack.length > 0) {
-                        const value = stack.pop();
-                        stack.unshift(value);
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "SHAKEN_ESPRESSO":
-                    if (stack.length > 0) {
-                        const value = stack.shift();
-                        stack.push(value);
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-                case "FULL_ORDER":
-                    handlePrintStack();
-                    break;
-                case "REPEAT":
-                    handleRepeat();
-                    break;
-                case "TIP":
-                    console.log("Enter the first number: ");
-                    await new Promise((resolve, reject) => {
-                        rl.question('', async (input1) => {
-                            const num1 = parseInt(input1);
-                            if (!isNaN(num1)) {
-                                console.log("Enter the second number: ");
-                                rl.question('', async (input2) => {
-                                    const num2 = parseInt(input2);
-                                    if (!isNaN(num2)) {
-                                        stack.push(num1);
-                                        stack.push(num2);
-                                        resolve();
-                                    } else {
-                                        console.log("Error: Invalid input.");
-                                        rl.close();
-                                        process.exit(0);
-                                    }
-                                });
-                            } else {
-                                console.log("Error: Invalid input.");
-                                rl.close();
-                                process.exit(0);
-                            }
-                        });
-                    });
-                    break;
-
-                case "MOCHA":
-                    // Check if there are enough elements on the stack
-                    if (stack.length > 1) {
-                        const a = pop();
-                        const b = pop();
-                        stack.push(b * a);
-                    } else {
-                        err("Error: Stack underflow");
-                    }
-                    break;
-
-                case "ASK":
-                    await handleAsk();
-                    break;
-                case "NAME":
-                    await handleName();
-                    break;
-                case "BLACK":
-                    process.exit(0);
-                    break;
-                default:
-                    console.log("Invalid instruction:", instr);
-                    process.exit(1);
-            }
-        }
+        interpret(lines);
     } catch (error) {
         console.log("Error while opening file:\n", error);
-        process.exit(0);
+        process.exit(1);
     }
-};
-
-// Call the interpret function
-interpret();
+} else {
+    console.log("Please provide a filename as a command-line argument.");
+    process.exit(1);
+}

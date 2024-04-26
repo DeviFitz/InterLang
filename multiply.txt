@@ -1,4 +1,5 @@
-TIP     # Get the numbers from the user and store it on the stack
-MOCHA   # Multiply the top two numbers on the stack and store the result on the stack
-COST    # Print the result
+TIP
+TIP
+MOCHA
+STRIGHTORDER
 BLACK
